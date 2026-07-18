@@ -12,10 +12,22 @@ builder.Services.AddDbContext<PokemonCenterContext>(options =>
 builder.Services.AddScoped<TreinadorService>();
 builder.Services.AddScoped<PokemonService>();
 builder.Services.AddScoped<MatriculaService>();
+builder.Services.AddScoped<PlanoService>();
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
+
+const string PoliticaCorsFrontend = "PoliticaCorsFrontend";
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(PoliticaCorsFrontend, policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
@@ -30,8 +42,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 
+app.UseCors(PoliticaCorsFrontend);
+
 app.MapTreinadorEndpoints();
 app.MapPokemonEndpoints();
 app.MapMatriculaEndpoints();
+app.MapPlanoEndpoints();
 
 app.Run();
