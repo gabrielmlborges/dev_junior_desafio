@@ -14,9 +14,12 @@ API REST para gestão de matrículas de Pokémon em planos de treinamento mensai
    ```
    docker-compose up -d
    ```
-2. Criar o schema (usuário `sa`, senha `PokemonCenter@2026`, porta `1433`):
+2. Criar o schema (usuário `sa`, senha `PokemonCenter@2026`, porta `1433`) rodando o `sqlcmd` de dentro do próprio container, sem precisar ter nada instalado na máquina:
    ```
-   sqlcmd -S localhost,1433 -U sa -P "PokemonCenter@2026" -C -i Database/schema.sql
+   docker cp Database/schema.sql pokemoncenter-sqlserver:/schema.sql
+   docker exec -it pokemoncenter-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+     -S localhost -U sa -P "PokemonCenter@2026" -C \
+     -i /schema.sql
    ```
    (ou rode o conteúdo de `Database/schema.sql` em qualquer client SQL Server, tipo Azure Data Studio.)
 3. Rodar a API:
@@ -26,6 +29,19 @@ API REST para gestão de matrículas de Pokémon em planos de treinamento mensai
    ```
    A connection string já está configurada em `appsettings.json` apontando pro banco do passo 1.
 
+## Como executar (frontend)
+
+1. Com o backend rodando (passo anterior), instale as dependências:
+   ```
+   cd FrontEnd/CentroDeTreinamentoPokemon
+   npm install
+   ```
+2. Suba o servidor de desenvolvimento:
+   ```
+   npm start
+   ```
+   (equivalente a `ng serve`)
+3. Acesse `http://localhost:4200`. A URL da API já está configurada em `src/app/config/api.config.ts` apontando pra `http://localhost:5289/api`, e o backend já libera CORS pra essa porta — se o front rodar em outra porta, ajuste o `Program.cs` do backend.
 
 ## Decisões técnicas e premissas assumidas
 
@@ -64,3 +80,5 @@ Usei o Claude Code (Anthropic) durante o desenvolvimento: code reviews, bug hunt
 - **Padronização das mensagens de erro:** revisei com a IA como centralizar as respostas de erro num `GlobalExceptionHandler` único, em vez de tratar exceção por exceção em cada endpoint, garantindo um formato JSON consistente pro frontend. Minha experiência até então era usar try/catch em cada rota.
 - **Modularização dos endpoints:** pedi ajuda a modularizar os endpoints em arquivos separados para o Program.cs não ficar muito grande. Antes eu geralmente escrevia os endpoints direto no Program.cs mesmo.
 - **Testes de ponta a ponta:** a IA subiu a API de verdade contra o SQL Server local e testou os fluxos reais via `curl` (criar treinador/Pokémon/matrícula, simular e confirmar upgrade, cancelar, re-matricular um Pokémon já cancelado) em vez de só verificar se o código compilava. Isso pegou dois bugs que só se manifestavam em runtime: o relacionamento `Pokemon`↔`Matricula` mal inferido pelo scaffold (um-para-um em vez de um-para-muitos, descrito acima) e um `Include` faltando no endpoint de cancelamento que causava erro 500 mesmo com a operação já persistida no banco.
+- **RxJS e Signals no frontend:** essa foi a parte que mais me trouxe dificuldade — misturar Observables do RxJS (as chamadas HTTP dos services) com Signals do Angular pra estado local dos componentes. O Claude Code me ajudou bastante a entender o padrão de converter `valueChanges` de `FormControl` em signal via `toSignal()` e depois derivar estado com `computed()` (por exemplo, recalcular os Pokémon disponíveis no formulário de matrícula toda vez que o treinador selecionado muda, ou re-simular o upgrade quando o plano novo é trocado), sem cair em assinatura duplicada ou em signal desatualizado.
+- **CSS e estrutura dos templates HTML:** pedi pro Claude Code gerar o CSS e a estrutura HTML dos componentes (tabela de matrículas, formulários, layout geral) — como o próprio enunciado do desafio diz que beleza visual não é critério de avaliação, preferi usar esse tempo focando nas regras de negócio (R1-R5) e no tratamento de erro, e deixar a parte visual por conta da IA.
