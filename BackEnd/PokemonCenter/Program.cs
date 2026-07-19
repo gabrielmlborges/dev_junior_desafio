@@ -17,6 +17,7 @@ builder.Services.AddScoped<PlanoService>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
+// Erros gerados pela validacao nao sao pegos no ExceptionHandler e estao em padrao de mensagem diferente
 builder.Services.AddValidation();
 
 const string PoliticaCorsFrontend = "PoliticaCorsFrontend";
