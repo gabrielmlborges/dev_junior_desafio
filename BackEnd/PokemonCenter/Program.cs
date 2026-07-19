@@ -17,6 +17,7 @@ builder.Services.AddScoped<PlanoService>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
+builder.Services.AddValidation();
 
 const string PoliticaCorsFrontend = "PoliticaCorsFrontend";
 builder.Services.AddCors(options =>
