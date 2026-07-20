@@ -8,40 +8,82 @@ API REST para gestão de matrículas de Pokémon em planos de treinamento mensai
 - Banco: SQL Server 2022 via Docker
 - Frontend: Angular
 
+## Pré-requisitos
+
+Antes de começar, você precisa ter instalado na máquina:
+
+| Dependência | Versão | Pra quê | Como verificar |
+|---|---|---|---|
+| [Git](https://git-scm.com/downloads) | qualquer | clonar o repositório | `git --version` |
+| [Docker](https://docs.docker.com/get-docker/) + Docker Compose | Docker 20.10+ | subir o SQL Server 2022 | `docker --version` e `docker compose version` |
+| [.NET SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | **10.0** | rodar a API | `dotnet --version` |
+| [Node.js](https://nodejs.org/) + npm | Node **22+** | rodar o frontend Angular 22 | `node --version` e `npm --version` |
+
+Não é preciso instalar SQL Server nem o `sqlcmd` — ambos vêm dentro do container Docker. O Angular CLI também não precisa ser instalado globalmente: ele vem como dependência de desenvolvimento do projeto e é usado via `npm start`.
+
+O Angular 22 exige Node 22 ou superior; o projeto foi desenvolvido e testado no Node 26.1.0.
+
+Portas usadas: `1433` (SQL Server), `5289` (API) e `4200` (frontend). Certifique-se de que estão livres.
+
+## Clonando o projeto
+
+```bash
+git clone git@github.com:gabrielmlborges/dev_junior_desafio.git
+cd dev_junior_desafio
+```
+
+(Se você não tem chave SSH configurada no GitHub, use HTTPS: `git clone https://github.com/gabrielmlborges/dev_junior_desafio.git`)
+
+Todos os comandos das seções abaixo assumem que você está na raiz do projeto (`dev_junior_desafio/`).
+
 ## Como executar (backend + banco)
 
-1. Subir o SQL Server:
+1. Subir o SQL Server (a partir da raiz do projeto):
+   ```bash
+   docker compose up -d
    ```
-   docker-compose up -d
-   ```
+   Aguarde alguns segundos até o container terminar de inicializar.
 2. Criar o schema (usuário `sa`, senha `PokemonCenter@2026`, porta `1433`) rodando o `sqlcmd` de dentro do próprio container, sem precisar ter nada instalado na máquina:
-   ```
+   ```bash
    docker cp Database/schema.sql pokemoncenter-sqlserver:/schema.sql
    docker exec -it pokemoncenter-sqlserver /opt/mssql-tools18/bin/sqlcmd \
      -S localhost -U sa -P "PokemonCenter@2026" -C \
      -i /schema.sql
    ```
-   (ou rode o conteúdo de `Database/schema.sql` em qualquer client SQL Server, tipo Azure Data Studio.)
 3. Rodar a API:
-   ```
+   ```bash
    cd BackEnd/PokemonCenter
+   dotnet restore
    dotnet run
    ```
-   A connection string já está configurada em `appsettings.json` apontando pro banco do passo 1.
+   A connection string já está configurada em `appsettings.json` apontando pro banco do passo 1. A API sobe em `http://localhost:5289` — deixe esse terminal aberto.
 
 ## Como executar (frontend)
 
-1. Com o backend rodando (passo anterior), instale as dependências:
-   ```
+Com o backend rodando, abra **um segundo terminal** na raiz do projeto:
+
+1. Instale as dependências:
+   ```bash
    cd FrontEnd/CentroDeTreinamentoPokemon
    npm install
    ```
 2. Suba o servidor de desenvolvimento:
-   ```
+   ```bash
    npm start
    ```
    (equivalente a `ng serve`)
 3. Acesse `http://localhost:4200`. A URL da API já está configurada em `src/app/config/api.config.ts` apontando pra `http://localhost:5289/api`, e o backend já libera CORS pra essa porta — se o front rodar em outra porta, ajuste o `Program.cs` do backend.
+
+## Consulta de MRR
+
+A consulta SQL de receita recorrente mensal está em `Database/consulta-mrr.sql` e pode ser rodada do mesmo jeito que o schema:
+
+```bash
+docker cp Database/consulta-mrr.sql pokemoncenter-sqlserver:/consulta-mrr.sql
+docker exec -it pokemoncenter-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P "PokemonCenter@2026" -C \
+  -i /consulta-mrr.sql
+```
 
 ## Decisões técnicas e premissas assumidas
 
@@ -57,10 +99,12 @@ API REST para gestão de matrículas de Pokémon em planos de treinamento mensai
 
 **R5 (transferência de Pokémon) — endpoint de ação dedicado**, não parte de um PUT genérico do Pokémon (`PATCH /api/pokemons/{id}/transferir`). Ele só atualiza o `treinadorId` do Pokémon; não mexe em cobrança nem no status das matrículas existentes, como pedido no enunciado.
 
-**Entidades geradas via scaffold do EF Core, com um ajuste manual necessário.** As classes em `Models/` vieram de `dotnet ef dbcontext scaffold` em cima do `Database/schema.sql`, seguindo a abordagem database-first do projeto. Só que o scaffold interpretou o relacionamento entre `Pokemon` e `Matricula` como **um-para-um**, porque viu o índice único `UX_Matricula_PokemonAtiva` na coluna `pokemonId` e não considerou que esse índice é filtrado (`WHERE status = 'Ativa'`) — ele garante só uma matrícula ativa por Pokémon, não uma matrícula só na vida inteira. Um Pokémon precisa acumular várias matrículas ao longo do tempo (histórico de `Cancelada`/`Concluida`), então o relacionamento correto é um-para-muitos. Isso só apareceu testando a API de verdade: o fluxo de upgrade quebrava com uma exceção do EF Core ao tentar criar uma segunda matrícula pro mesmo Pokémon. Corrigi manualmente `Pokemon.cs` (navegação `ICollection<Matricula>` em vez de `Matricula?`) e o mapeamento em `PokemonCenterContext.cs` (`WithMany` em vez de `WithOne`) — reexecutar o scaffold sozinho não resolveria, porque a heurística dele não relê o filtro do índice.
+**Entidades geradas via scaffold do EF Core, com um ajuste manual necessário.** As classes em `Models/` vieram de `dotnet ef dbcontext scaffold` em cima do `Database/schema.sql`, seguindo a abordagem database-first do projeto. Só que o scaffold interpretou o relacionamento entre `Pokemon` e `Matricula` como **um-para-um**, porque viu o índice único `UX_Matricula_PokemonAtiva` na coluna `pokemonId` e não considerou que esse índice é filtrado (`WHERE status = 'Ativa'`) — ele garante só uma matrícula ativa por Pokémon, não uma matrícula só na vida inteira. Um Pokémon precisa acumular várias matrículas ao longo do tempo (histórico de `Cancelada`/`Concluida`), então o relacionamento correto é um-para-muitos. Isso só apareceu testando a API de verdade: o fluxo de upgrade quebrava com uma exceção do EF Core ao tentar criar uma segunda matrícula pro mesmo Pokémon. Corrigi manualmente `Pokemon.cs` (navegação `ICollection<Matricula>` em vez de `Matricula?`) e o mapeamento em `PokemonCenterContext.cs` (`WithMany` em vez de `WithOne`).
 ## Mensagens de erro padronizadas
 
 Todo erro de regra de negócio (R1, R3, downgrade em R2) e de recurso não encontrado passa por um `GlobalExceptionHandler` central, que converte exceções em respostas JSON consistentes: `RegraDeNegocioException` → 400, `RecursoNaoEncontradoException` → 404, qualquer outra coisa → 500 com mensagem genérica (pra não vazar detalhe interno pro cliente). O formato de resposta é sempre `{ "mensagem": "..." }`, pronto pro frontend exibir direto.
+
+**Débito técnico conhecido: os erros de validação de payload fogem desse padrão.** A validação automática dos DTOs (`AddValidation()`) é executada pelo próprio pipeline do ASP.NET Core antes do endpoint rodar, então ela não passa pelo `GlobalExceptionHandler`. A API hoje responde em dois formatos diferentes dependendo de onde o erro nasce: regra de negócio devolve `{ "mensagem": "..." }`, e validação de campo devolve o `ProblemDetails` padrão do framework, com os erros agrupados por campo dentro de `errors`. Identifiquei isso durante o desenvolvimento e deixei documentado no `Program.cs`, mas optei por não unificar.
 
 ## Organização dos endpoints
 
