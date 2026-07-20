@@ -1,12 +1,12 @@
 <h2>Matrículas</h2>
 
 <div class="filtros">
-  <mat-form-field appearance="outline">
+  <mat-form-field appearance="outline" class="filtro-busca">
     <mat-label>Buscar por Pokémon ou Treinador</mat-label>
     <input matInput [formControl]="busca" />
   </mat-form-field>
 
-  <mat-form-field appearance="outline">
+  <mat-form-field appearance="outline" class="filtro-status">
     <mat-label>Status</mat-label>
     <mat-select [formControl]="filtroStatus">
       <mat-option value="Todas">Todas</mat-option>
