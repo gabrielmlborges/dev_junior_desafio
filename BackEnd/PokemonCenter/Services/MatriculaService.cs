@@ -122,7 +122,7 @@ public class MatriculaService
 
         decimal creditoDoPlanoAntigo = matricula.Plano.ValorMensal * (diasRestantes / (decimal)diasCiclo);
         decimal custonovoPlanoDiasRestantes = novoPlano.ValorMensal * (diasRestantes / (decimal)diasCiclo);
-        decimal primeiraCobranca = custonovoPlanoDiasRestantes - creditoDoPlanoAntigo;
+        decimal primeiraCobranca = Math.Round(custonovoPlanoDiasRestantes - creditoDoPlanoAntigo, 2);
 
         return (matricula, novoPlano, primeiraCobranca);
 
