@@ -115,14 +115,23 @@ public class MatriculaService
 
         var hoje = DateOnly.FromDateTime(DateTime.Now);
 
-        const int diasCiclo = 30;
-        var diasDecorridos = hoje.DayNumber - matricula.DataInicio.DayNumber;
-        var diasDecorridosNoCiclo = diasDecorridos % diasCiclo;
-        var diasRestantes = diasCiclo - diasDecorridosNoCiclo;
+        var mesesDecorridos = (hoje.Year - matricula.DataInicio.Year) * 12
+                            + (hoje.Month - matricula.DataInicio.Month);
+
+        var inicioCiclo = matricula.DataInicio.AddMonths(mesesDecorridos);
+        if (inicioCiclo > hoje)
+        {
+            inicioCiclo = matricula.DataInicio.AddMonths(--mesesDecorridos);
+        }
+        var fimCiclo = matricula.DataInicio.AddMonths(mesesDecorridos + 1);
+
+        var diasCiclo = fimCiclo.DayNumber - inicioCiclo.DayNumber;
+        var diasRestantes = fimCiclo.DayNumber - hoje.DayNumber;
 
         decimal creditoDoPlanoAntigo = matricula.Plano.ValorMensal * (diasRestantes / (decimal)diasCiclo);
         decimal custonovoPlanoDiasRestantes = novoPlano.ValorMensal * (diasRestantes / (decimal)diasCiclo);
-        decimal primeiraCobranca = Math.Round(custonovoPlanoDiasRestantes - creditoDoPlanoAntigo, 2);
+        decimal primeiraCobranca = Math.Round(
+            custonovoPlanoDiasRestantes - creditoDoPlanoAntigo, 2, MidpointRounding.AwayFromZero);
 
         return (matricula, novoPlano, primeiraCobranca);
 
